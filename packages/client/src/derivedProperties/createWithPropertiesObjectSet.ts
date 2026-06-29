@@ -35,11 +35,24 @@ export function createWithPropertiesObjectSet<
 ): DerivedProperty.SelectPropertyBuilder<Q, false> {
   return {
     pivotTo: (link) => {
-      return createWithPropertiesObjectSet(objectType, {
-        type: "searchAround",
-        objectSet,
-        link,
-      }, definitionMap);
+      // The first pivot off an interface base traverses an interface link type. The backend resolves
+      // derived properties over an interface link only from the exact wire shape
+      // interfaceLinkSearchAround(methodInput, ilt); a plain searchAround there is unsupported.
+      // objectType stays the original base across chained pivots, so gate on the methodInput base to
+      // keep later hops (off concrete linked types) as native searchAround.
+      const wrappedObjectSet: WireObjectSet =
+        objectType.type === "interface" && objectSet.type === "methodInput"
+          ? {
+            type: "interfaceLinkSearchAround",
+            objectSet,
+            interfaceLink: link,
+          }
+          : { type: "searchAround", objectSet, link };
+      return createWithPropertiesObjectSet(
+        objectType,
+        wrappedObjectSet,
+        definitionMap,
+      );
     },
     where: (clause) => {
       const rdpNames = new Set(definitionMap.keys());

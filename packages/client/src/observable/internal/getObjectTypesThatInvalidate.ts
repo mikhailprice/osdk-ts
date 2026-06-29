@@ -215,8 +215,16 @@ async function calcObjectSet(
       // otherwise it will double count everything
       return (await calcObjectSet(ctx.methodInput, { ...ctx, counts: {} }));
 
-    case "asType":
-      // we don't currently support this anywhere.
+    case "asType": {
+      // asType casts the wrapped set to entityType (e.g. narrowToType to an interface). Recurse to
+      // register the wrapped set's invalidating types, then report entityType as the resolved
+      // context so set operations whose members are cast to the same type stay compatible.
+      const innerDef = await calcObjectSet(os.objectSet, ctx);
+      return innerDef.type === "object"
+        ? await bumpInterface(os.entityType)
+        : await bumpObject(os.entityType);
+    }
+
     case "asBaseObjectTypes":
       // We don't currently support this because it could return multiple object types conceptually
       // internally, we actually use it this way but we shouldn't be finding that object sets.
